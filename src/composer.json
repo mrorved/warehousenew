@@ -1,0 +1,9 @@
+{
+    "name": "warehouse/acceptance-app",
+    "description": "Warehouse Acceptance and Barcode Management System",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "phpoffice/phpspreadsheet": "^1.29"
+    }
+}

@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Склад | Приёмка и Штрихкоды</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #cbd5e1;
+      --success: #16a34a;
+      --success-bg: #dcfce7;
+      --warning: #d97706;
+      --warning-bg: #fef3c7;
+      --danger: #dc2626;
+      --danger-bg: #fee2e2;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* --- TOP HEADER (STICKY) --- */
+    .app-header {
+      background: #0f172a;
+      color: #fff;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+    .app-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.3s;
+    }
+    .status-online { background: #15803d; color: #fff; }
+    .status-offline { background: #b45309; color: #fff; }
+    .status-syncing { background: #0369a1; color: #fff; }
+
+    .tsd-toggle-btn {
+      background: #334155;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .tsd-toggle-btn.active {
+      background: #3b82f6;
+      border-color: #60a5fa;
+      color: #fff;
+    }
+
+    /* --- SCANNER BAR --- */
+    .scan-bar {
+      background: #1e293b;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+      border-bottom: 2px solid #334155;
+    }
+    .scan-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .scan-input {
+      width: 100%;
+      height: 48px;
+      background: #0f172a;
+      border: 2px solid #475569;
+      border-radius: var(--radius);
+      color: #f8fafc;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 0 12px;
+      outline: none;
+      font-family: monospace;
+      letter-spacing: 1px;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+    .scan-input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
+    .scan-input.flash-success {
+      border-color: var(--success) !important;
+      background: #064e3b !important;
+    }
+    .scan-input.flash-warning {
+      border-color: var(--warning) !important;
+      background: #78350f !important;
+    }
+    .scan-input.flash-danger {
+      border-color: var(--danger) !important;
+      background: #7f1d1d !important;
+    }
+
+    /* --- ACTIVE SHEET SUMMARY --- */
+    .sheet-summary {
+      background: #334155;
+      padding: 6px 10px;
+      border-radius: 6px;
+      color: #cbd5e1;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: #475569;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: #22c55e;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    /* --- LAST SCANNED NOTIFICATION CARD --- */
+    .last-scanned-card {
+      background: #eff6ff;
+      border-left: 4px solid var(--primary);
+      padding: 8px 12px;
+      font-size: 13px;
+      flex-shrink: 0;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      animation: fadeIn 0.2s ease;
+    }
+    .last-scanned-card.show { display: flex; }
+    .last-scanned-title { font-weight: 700; color: #1e3a8a; }
+    .last-scanned-place { 
+      background: #1e3a8a; 
+      color: #fff; 
+      padding: 3px 8px; 
+      border-radius: 4px; 
+      font-weight: bold; 
+      font-size: 14px;
+    }
+
+    /* --- MAIN VIEW CONTENT --- */
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* --- FILTER CHIPS --- */
+    .filter-chips {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      flex-shrink: 0;
+    }
+    .chip {
+      background: #e2e8f0;
+      color: #475569;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .chip.active {
+      background: #0f172a;
+      color: #fff;
+    }
+
+    /* --- ITEM CARDS LIST --- */
+    .items-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .item-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: background 0.2s, transform 0.1s;
+    }
+    .item-card.highlight {
+      border: 2px solid var(--primary);
+      background: #f0f7ff;
+      transform: scale(1.01);
+    }
+    .item-card.state-complete {
+      border-left: 6px solid var(--success);
+      background: #f0fdf4;
+    }
+    .item-card.state-over {
+      border-left: 6px solid var(--danger);
+      background: #fef2f2;
+    }
+    .item-card.state-partial {
+      border-left: 6px solid var(--warning);
+      background: #fffbeb;
+    }
+
+    .item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .item-code {
+      font-family: monospace;
+      font-weight: 700;
+      font-size: 15px;
+      color: #0f172a;
+    }
+    .item-place {
+      font-size: 13px;
+      font-weight: 700;
+      background: #0f172a;
+      color: #fff;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+    .item-name {
+      font-size: 14px;
+      color: #334155;
+      line-height: 1.3;
+    }
+    .item-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+      padding-top: 6px;
+      border-top: 1px dashed var(--border);
+    }
+    .qty-badge {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .qty-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .item-qty-input {
+      width: 80px;
+      height: 38px;
+      background: #ffffff;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 800;
+      text-align: center;
+      color: #0f172a;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .item-qty-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+      background: #f8fafc;
+    }
+
+    /* --- BOTTOM NAVIGATION BAR --- */
+    .bottom-nav {
+      background: #0f172a;
+      display: flex;
+      height: 56px;
+      flex-shrink: 0;
+      border-top: 1px solid #334155;
+    }
+    .nav-btn {
+      flex: 1;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .nav-btn.active {
+      color: #38bdf8;
+    }
+    .nav-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+
+    /* --- COMMON BUTTONS & FORMS --- */
+    .btn {
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      border: none;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:active { background: var(--primary-dark); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-warning { background: var(--warning); color: #fff; }
+    .btn-secondary { background: #64748b; color: #fff; }
+
+    /* --- MODALS & PANELS --- */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 12px;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal-window {
+      background: var(--surface);
+      border-radius: var(--radius);
+      max-width: 500px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 17px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    /* --- SHEETS TAB CARDS --- */
+    .sheet-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .sheet-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .sheet-status-tag {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: bold;
+    }
+    .sheet-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+
+    /* --- LOCATION SEARCH SCREEN --- */
+    .location-display {
+      background: #0f172a;
+      color: #38bdf8;
+      padding: 20px;
+      border-radius: var(--radius);
+      text-align: center;
+      margin: 10px 0;
+    }
+    .location-place-huge {
+      font-size: 42px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: #f8fafc;
+    }
+    .location-packings-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .location-pack-item {
+      background: #1e293b;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP HEADER -->
+  <header class="app-header">
+    <div class="app-title">
+      <span>📦 СКЛАД</span>
+    </div>
+    <div class="header-badges">
+      <button class="tsd-toggle-btn active" id="tsdModeBtn" title="Блокирует экранную клавиатуру для аппаратного сканера ТСД">
+        ⌨️ ТСД
+      </button>
+      <div class="status-badge status-online" id="networkBadge">
+        ● В сети
+      </div>
+    </div>
+  </header>
+
+  <!-- SCANNER BAR -->
+  <section class="scan-bar" id="scanSection">
+    <div class="scan-input-wrapper">
+      <input 
+        type="text" 
+        class="scan-input" 
+        id="barcodeInput" 
+        placeholder="СКАНИРУЙТЕ ШТРИХКОД" 
+        autocomplete="off" 
+        autocapitalize="off" 
+        spellcheck="false"
+      />
+    </div>
+    <div class="sheet-summary" id="sheetSummaryBox">
+      <span id="currentSheetTitle">Упаковочный лист не выбран</span>
+      <span id="sheetCounts">0 / 0 шт (0%)</span>
+    </div>
+    <div class="progress-bar-bg" id="progressBarBg">
+      <div class="progress-bar-fill" id="progressBarFill"></div>
+    </div>
+  </section>
+
+  <!-- LAST SCANNED NOTIFICATION CARD -->
+  <div class="last-scanned-card" id="lastScannedCard">
+    <div>
+      <div class="last-scanned-title" id="lastScannedName">Название товара</div>
+      <div style="font-size: 12px; color:#475569;" id="lastScannedDetail">+12 шт (Минибокс)</div>
+    </div>
+    <div class="last-scanned-place" id="lastScannedPlace">00-00-00</div>
+  </div>
+
+  <!-- MAIN SCROLLABLE CONTENT -->
+  <main class="main-content">
+
+    <!-- 1. ACCEPTANCE TAB -->
+    <div id="tab-acceptance" class="tab-view">
+      <div class="filter-chips">
+        <button class="chip active" data-filter="all">Все (<span id="countAll">0</span>)</button>
+        <button class="chip" data-filter="remaining">Осталось (<span id="countRemaining">0</span>)</button>
+        <button class="chip" data-filter="done">Принято (<span id="countDone">0</span>)</button>
+        <button class="chip" data-filter="issues">Расхождения (<span id="countIssues">0</span>)</button>
+      </div>
+
+      <div style="margin: 8px 0; display: flex; gap: 8px;">
+        <button class="btn btn-secondary" onclick="switchTab('sheets')" style="flex: 1; padding: 12px 10px;">
+          📁 К листам
+        </button>
+        <button class="btn btn-success" id="btnCompletePacking" style="flex: 2; padding: 12px 10px;">
+          ✓ Завершить приёмку листа
+        </button>
+      </div>
+
+      <div class="items-list" id="acceptanceItemsList">
+        <div style="text-align:center; padding: 40px 10px; color: var(--text-muted);">
+          Выберите упаковочный лист во вкладке «Листы» для начала работы
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. LOCATION SEARCH TAB -->
+    <div id="tab-location" class="tab-view" style="display:none;">
+      <h3 style="margin-bottom: 8px;">🔍 Быстрый поиск места хранения</h3>
+      <div style="position:relative; margin-bottom: 12px; display:flex; gap:8px;">
+        <input 
+          type="text" 
+          id="locationSearchInput" 
+          class="scan-input" 
+          placeholder="Штрихкод или артикул (Enter)..." 
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          style="background:#fff; color:#000; border-color:#94a3b8; flex:1;"
+        />
+        <button class="btn btn-primary" id="btnLocationSearch" style="padding:0 18px; font-weight:700;">
+          Найти
+        </button>
+      </div>
+
+      <div id="locationResultContainer">
+        <div style="text-align:center; padding: 40px 20px; color: var(--text-muted);">
+          Отсканируйте штрихкод или введите артикул и нажмите Enter для поиска ячейки
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. PACKING LISTS TAB -->
+    <div id="tab-sheets" class="tab-view" style="display:none;">
+      <div style="display: flex; justify-content: space-between; align-items:center; margin-bottom: 10px;">
+        <h3>📁 Упаковочные листы</h3>
+        <button class="btn btn-primary" id="btnUploadSheet">
+          + Загрузить Excel
+        </button>
+      </div>
+      <input type="file" id="fileUploadInput" accept=".xlsx,.xls,.csv" style="display:none;" />
+
+      <div class="items-list" id="sheetsListContainer">
+        <div style="text-align:center; padding: 20px; color: var(--text-muted);">Загрузка списка...</div>
+      </div>
+    </div>
+
+    <!-- 4. BARCODE DATABASE & EXCEL TAB -->
+    <div id="tab-database" class="tab-view" style="display:none;">
+      <h3 style="margin-bottom: 8px;">⚙️ База штрихкодов</h3>
+      
+      <div style="background:#fff; padding:12px; border-radius:var(--radius); border:1px solid var(--border); margin-bottom:12px;">
+        <div style="font-weight:700; margin-bottom:6px;">Синхронизация через Excel:</div>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">
+          Вы можете скачать полную базу в Excel, добавить новые штрихкоды или товары и залить обратно.
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <a href="/api/import_export.php?action=export" class="btn btn-secondary" style="flex:1; text-decoration:none;">
+            📥 Скачать базу (.xlsx)
+          </a>
+          <button class="btn btn-primary" id="btnImportExcel" style="flex:1;">
+            📤 Залить Excel (Merge)
+          </button>
+          <input type="file" id="dbExcelUploadInput" accept=".xlsx,.xls" style="display:none;" />
+        </div>
+      </div>
+
+      <div style="background:#fff; padding:12px; border-radius:var(--radius); border:1px solid var(--border); margin-bottom:12px;" id="dbStatsBox">
+        <div style="font-weight:700; margin-bottom:4px;">Статистика базы:</div>
+        <div style="font-size:13px; color:#475569;" id="dbStatsText">Загрузка данных...</div>
+      </div>
+
+      <div style="margin-bottom: 8px;">
+        <label style="font-size: 13px; font-weight:700;">Фильтр по производителю:</label>
+        <select id="dbManufacturerSelect" style="width:100%; height:40px; border-radius:6px; border:1px solid var(--border); padding:0 8px; font-size:14px; margin-top:4px;">
+          <option value="">-- Все производители --</option>
+        </select>
+      </div>
+
+      <div class="items-list" id="dbProductsListContainer"></div>
+    </div>
+
+  </main>
+
+  <!-- BOTTOM NAVIGATION -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="acceptance">
+      <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
+      Приёмка
+    </button>
+    <button class="nav-btn" data-tab="location">
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      Место
+    </button>
+    <button class="nav-btn" data-tab="sheets">
+      <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+      Листы
+    </button>
+    <button class="nav-btn" data-tab="database">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+      База ШК
+    </button>
+  </nav>
+
+  <!-- JAVASCRIPT APPLICATION LOGIC -->
+  <script>
+    /**
+     * WAREHOUSE ACCEPTANCE & ZERO-LOSS SCANNER SPA
+     */
+
+    // --- APPLICATION STATE ---
+    let activeTab = 'acceptance';
+    let currentSheet = null; // { id, filename, original_name, status, total_items, total_expected_qty }
+    let sheetItems = [];     // Array of items in current sheet
+    let barcodeMap = new Map(); // barcode => { supplier_code, name, box_qty, packaging_type, place }
+    let syncQueue = [];      // Offline-first outbox: array of { code, barcode, qty, client_time }
+    let isSyncing = false;
+    let currentFilter = 'all';
+    let isTsdKeyboardBlocked = true;
+
+    // --- SOUND ENGINE (WEB AUDIO SYNTHESIZER) ---
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playSound(type) {
+      try {
+        const ctx = getAudioContext();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (type === 'success') {
+          // Double crisp high beep
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(880, now);
+          osc.frequency.setValueAtTime(1320, now + 0.08);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.16);
+          osc.start(now);
+          osc.stop(now + 0.16);
+          if (navigator.vibrate) navigator.vibrate([60]);
+        } else if (type === 'warning') {
+          // Overage chord
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.setValueAtTime(554, now + 0.1);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        } else {
+          // Low error buzz
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(200, now);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now);
+          osc.stop(now + 0.3);
+          if (navigator.vibrate) navigator.vibrate([200, 80, 200]);
+        }
+      } catch (e) {
+        // Fallback or audio not allowed yet
+      }
+    }
+
+    // --- HARDWARE TSD SCANNER FOCUS & KEYBOARD SUPPRESSION ---
+    const barcodeInput = document.getElementById('barcodeInput');
+    const tsdModeBtn = document.getElementById('tsdModeBtn');
+
+    function applyTsdMode(blocked) {
+      isTsdKeyboardBlocked = blocked;
+      const locInput = document.getElementById('locationSearchInput');
+      if (blocked) {
+        barcodeInput.setAttribute('inputmode', 'none');
+        if (locInput) locInput.setAttribute('inputmode', 'none');
+        tsdModeBtn.classList.add('active');
+        tsdModeBtn.textContent = '⌨️ ТСД (Блок)';
+      } else {
+        barcodeInput.removeAttribute('inputmode');
+        if (locInput) locInput.removeAttribute('inputmode');
+        tsdModeBtn.classList.remove('active');
+        tsdModeBtn.textContent = '⌨️ Экранная';
+      }
+      refocusScanner();
+    }
+
+    tsdModeBtn.addEventListener('click', () => {
+      applyTsdMode(!isTsdKeyboardBlocked);
+    });
+
+    function refocusScanner() {
+      if (activeTab === 'acceptance') {
+        setTimeout(() => {
+          barcodeInput.focus();
+        }, 50);
+      } else if (activeTab === 'location') {
+        setTimeout(() => {
+          const locInput = document.getElementById('locationSearchInput');
+          if (locInput) locInput.focus();
+        }, 50);
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      // Auto-refocus if clicking anywhere outside inputs or buttons
+      if (!['INPUT', 'BUTTON', 'SELECT', 'A'].includes(e.target.tagName)) {
+        refocusScanner();
+      }
+    });
+
+    // --- NAVIGATION TABS ---
+    const navButtons = document.querySelectorAll('.nav-btn');
+    const tabViews = document.querySelectorAll('.tab-view');
+
+    navButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        switchTab(tab);
+      });
+    });
+
+    function switchTab(tab) {
+      activeTab = tab;
+      try {
+        localStorage.setItem('warehouse_active_tab', tab);
+      } catch (e) {}
+      navButtons.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      tabViews.forEach(v => {
+        v.style.display = (v.id === `tab-${tab}`) ? 'block' : 'none';
+      });
+
+      const scanSection = document.getElementById('scanSection');
+      if (tab === 'acceptance') {
+        scanSection.style.display = 'flex';
+        refocusScanner();
+      } else {
+        scanSection.style.display = 'none';
+      }
+
+      if (tab === 'sheets') loadPackingSheetsList();
+      if (tab === 'database') loadDatabaseTab();
+      if (tab === 'location') {
+        setTimeout(() => document.getElementById('locationSearchInput').focus(), 100);
+      }
+    }
+
+    // --- LOCAL-FIRST OFFLINE SYNC ENGINE (ZERO LOSS) ---
+    function updateNetworkStatus() {
+      const badge = document.getElementById('networkBadge');
+      if (isSyncing) {
+        badge.className = 'status-badge status-syncing';
+        badge.textContent = '⟳ Синхронизация...';
+      } else if (syncQueue.length > 0) {
+        badge.className = 'status-badge status-offline';
+        badge.textContent = `🟡 Офлайн (${syncQueue.length})`;
+      } else {
+        badge.className = 'status-badge status-online';
+        badge.textContent = '● В сети';
+      }
+    }
+
+    window.addEventListener('online', () => {
+      triggerSync();
+    });
+    window.addEventListener('offline', () => {
+      updateNetworkStatus();
+    });
+
+    function saveLocalState() {
+      if (!currentSheet) return;
+      try {
+        localStorage.setItem(`warehouse_sheet_${currentSheet.id}`, JSON.stringify({
+          sheet: currentSheet,
+          items: sheetItems
+        }));
+        localStorage.setItem('warehouse_sync_queue', JSON.stringify(syncQueue));
+      } catch (e) {
+        console.error('Local storage full or disabled', e);
+      }
+    }
+
+    function loadLocalState() {
+      try {
+        const savedQueue = localStorage.getItem('warehouse_sync_queue');
+        if (savedQueue) {
+          syncQueue = JSON.parse(savedQueue) || [];
+        }
+      } catch (e) {
+        syncQueue = [];
+      }
+      updateNetworkStatus();
+    }
+
+    async function triggerSync() {
+      if (!currentSheet || isSyncing || syncQueue.length === 0) {
+        updateNetworkStatus();
+        return;
+      }
+
+      isSyncing = true;
+      updateNetworkStatus();
+
+      const batchEvents = [...syncQueue];
+      // Build items map: code => accepted_qty
+      const itemsMap = {};
+      sheetItems.forEach(it => {
+        itemsMap[it.code] = it.accepted_qty;
+      });
+
+      try {
+        const res = await fetch('/api/packing_state.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'sync',
+            list_id: currentSheet.id,
+            items: itemsMap,
+            events: batchEvents
+          })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (data.success) {
+          // Remove synced batch
+          syncQueue.splice(0, batchEvents.length);
+          saveLocalState();
+        } else {
+          throw new Error(data.error || 'Server error');
+        }
+      } catch (err) {
+        // Keep queue intact on network drop, will retry next interval
+        console.warn('Sync failed, items queued locally:', err.message);
+      } finally {
+        isSyncing = false;
+        updateNetworkStatus();
+      }
+    }
+
+    // Auto-sync interval every 3 seconds
+    setInterval(triggerSync, 3000);
+
+    // --- BARCODE SCANNING & INSTANT PIK HANDLING ---
+    function flashInput(status) {
+      barcodeInput.classList.remove('flash-success', 'flash-warning', 'flash-danger');
+      barcodeInput.classList.add(`flash-${status}`);
+      setTimeout(() => {
+        barcodeInput.classList.remove(`flash-${status}`);
+      }, 500);
+    }
+
+    function handleScannedBarcode(rawCode) {
+      let barcode = rawCode.trim();
+      if (barcode.endsWith('+ET')) {
+        barcode = barcode.replace(/\+ET$/, '');
+      }
+      if (!barcode) return;
+
+      if (!currentSheet) {
+        alert('Сначала выберите или загрузите упаковочный лист во вкладке «Листы»!');
+        switchTab('sheets');
+        return;
+      }
+
+      if (currentSheet.status === 'completed') {
+        alert('Этот упаковочный лист уже принят и находится в архиве. Редактирование заблокировано.\nДля повторной приёмки нажмите «Перепринять» во вкладке «Листы».');
+        return;
+      }
+
+      // 1. Instant lookup in local barcode map
+      const barcodeInfo = barcodeMap.get(barcode);
+      let targetCode = barcodeInfo ? barcodeInfo.supplier_code : barcode;
+      let qtyToAdd = barcodeInfo ? barcodeInfo.box_qty : 1;
+      let packType = barcodeInfo ? barcodeInfo.packaging_type : 'Штука';
+      let place = barcodeInfo ? barcodeInfo.place : '';
+
+      // 2. Find in current sheet
+      let item = sheetItems.find(it => it.code === targetCode || it.code === barcode);
+
+      if (!item) {
+        // If not found in sheet, check if product is known in DB
+        const name = barcodeInfo ? barcodeInfo.name : 'Новая позиция ' + barcode;
+        item = {
+          num: '+',
+          code: targetCode,
+          name: name,
+          expected_qty: 0,
+          accepted_qty: 0,
+          place: place
+        };
+        sheetItems.unshift(item); // Put at top of list
+      }
+
+      // 3. Instant local update (0 ms latency!)
+      item.accepted_qty += qtyToAdd;
+      currentSheet.total_accepted_qty = sheetItems.reduce((acc, it) => acc + (it.accepted_qty || 0), 0);
+
+      // Sound and visual feedback
+      const isOver = item.expected_qty > 0 && item.accepted_qty > item.expected_qty;
+      const isExact = item.expected_qty > 0 && item.accepted_qty === item.expected_qty;
+
+      if (isOver) {
+        playSound('warning');
+        flashInput('warning');
+      } else {
+        playSound('success');
+        flashInput('success');
+      }
+
+      // Show last scanned card
+      showLastScanned(item.name, `+${qtyToAdd} шт (${packType}) • Всего: ${item.accepted_qty}`, item.place || '—');
+
+      // Append to background sync queue
+      syncQueue.push({
+        code: item.code,
+        barcode: barcode,
+        qty: qtyToAdd,
+        client_time: new Date().toISOString()
+      });
+
+      // Update UI and save snapshot
+      saveLocalState();
+      renderAcceptanceItems(item.code);
+      updateSheetProgress();
+      triggerSync();
+    }
+
+    function showLastScanned(name, detail, place) {
+      const card = document.getElementById('lastScannedCard');
+      document.getElementById('lastScannedName').textContent = name;
+      document.getElementById('lastScannedDetail').textContent = detail;
+      document.getElementById('lastScannedPlace').textContent = place;
+      card.classList.add('show');
+    }
+
+    // Input event listeners (handles Enter key and fast typing)
+    barcodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = barcodeInput.value;
+        barcodeInput.value = '';
+        handleScannedBarcode(val);
+      }
+    });
+
+    barcodeInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (val.endsWith('+ET')) {
+        barcodeInput.value = '';
+        handleScannedBarcode(val);
+      }
+    });
+
+    // --- ACCEPTANCE TAB UI & RENDERING ---
+    function updateSheetProgress() {
+      const btnComplete = document.getElementById('btnCompletePacking');
+
+      if (!currentSheet) {
+        document.getElementById('currentSheetTitle').textContent = 'Упаковочный лист не выбран';
+        document.getElementById('sheetCounts').textContent = '0 / 0 шт (0%)';
+        document.getElementById('progressBarFill').style.width = '0%';
+        if (btnComplete) btnComplete.style.display = 'none';
+        return;
+      }
+
+      if (btnComplete) {
+        btnComplete.style.display = (currentSheet.status === 'completed') ? 'none' : 'block';
+      }
+
+      const totalExpected = currentSheet.total_expected_qty || 0;
+      const totalAccepted = currentSheet.total_accepted_qty || 0;
+      const percent = totalExpected > 0 ? Math.min(100, Math.round((totalAccepted / totalExpected) * 100)) : 0;
+
+      document.getElementById('currentSheetTitle').textContent = currentSheet.original_name + (currentSheet.status === 'completed' ? ' (ПРИНЯТ)' : '');
+      document.getElementById('sheetCounts').textContent = `${totalAccepted} / ${totalExpected} шт (${percent}%)`;
+      document.getElementById('progressBarFill').style.width = `${percent}%`;
+
+      // Update chips counts
+      let remaining = 0;
+      let done = 0;
+      let issues = 0;
+
+      sheetItems.forEach(it => {
+        if (it.accepted_qty === 0) remaining++;
+        else if (it.accepted_qty < it.expected_qty) remaining++;
+        else if (it.accepted_qty === it.expected_qty) done++;
+        else if (it.accepted_qty > it.expected_qty) issues++;
+        if (it.expected_qty === 0 && it.accepted_qty > 0) issues++;
+      });
+
+      document.getElementById('countAll').textContent = sheetItems.length;
+      document.getElementById('countRemaining').textContent = remaining;
+      document.getElementById('countDone').textContent = done;
+      document.getElementById('countIssues').textContent = issues;
+    }
+
+    function renderAcceptanceItems(highlightCode = null) {
+      const container = document.getElementById('acceptanceItemsList');
+      if (!currentSheet || sheetItems.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding: 40px 10px; color: var(--text-muted);">Лист пуст или не выбран</div>';
+        return;
+      }
+
+      // Filter items
+      const filtered = sheetItems.filter(it => {
+        if (currentFilter === 'all') return true;
+        if (currentFilter === 'remaining') return it.accepted_qty < it.expected_qty;
+        if (currentFilter === 'done') return it.accepted_qty === it.expected_qty && it.expected_qty > 0;
+        if (currentFilter === 'issues') return it.accepted_qty > it.expected_qty || (it.expected_qty === 0 && it.accepted_qty > 0);
+        return true;
+      });
+
+      let html = '';
+      filtered.forEach(it => {
+        let stateClass = '';
+        if (it.expected_qty > 0 && it.accepted_qty === it.expected_qty) stateClass = 'state-complete';
+        else if (it.accepted_qty > it.expected_qty || (it.expected_qty === 0 && it.accepted_qty > 0)) stateClass = 'state-over';
+        else if (it.accepted_qty > 0) stateClass = 'state-partial';
+
+        const isHighlight = highlightCode && it.code === highlightCode;
+        const isCompleted = currentSheet && currentSheet.status === 'completed';
+
+        html += `
+          <div class="item-card ${stateClass} ${isHighlight ? 'highlight' : ''}" id="card-item-${it.code}">
+            <div class="item-header">
+              <span class="item-code">#${it.num} ${it.code}</span>
+              <span class="item-place">${it.place || 'Без места'}</span>
+            </div>
+            <div class="item-name">${it.name}</div>
+            <div class="item-footer">
+              <span class="qty-badge">Заявлено: <strong>${it.expected_qty}</strong></span>
+              <div class="qty-controls">
+                <span style="font-size:13px; font-weight:700; color:var(--text-muted);">Принято:</span>
+                <input 
+                  type="number" 
+                  min="0" 
+                  class="item-qty-input" 
+                  value="${it.accepted_qty}" 
+                  data-code="${it.code}"
+                  ${isCompleted ? 'disabled style="background:var(--border); opacity:0.7; cursor:not-allowed;"' : 'onfocus="this.select()" onchange="setItemQtyDirectly(\'' + it.code + '\', this.value)" onkeydown="if(event.key===\'Enter\'){this.blur();}"'}
+                />
+                ${(it.expected_qty === 0 || it.num === '+') && !isCompleted ? `
+                  <button class="btn btn-danger" style="padding: 4px 8px; font-size: 13px; margin-left: 4px;" title="Удалить ошибочную позицию" onclick="removeUnplannedItem('${it.code}')">
+                    🗑
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+
+      // Auto-scroll to highlighted item
+      if (highlightCode) {
+        const el = document.getElementById(`card-item-${highlightCode}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+
+    // Filter chip clicks
+    document.querySelectorAll('.filter-chips .chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.filter-chips .chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentFilter = chip.dataset.filter;
+        renderAcceptanceItems();
+      });
+    });
+
+    window.removeUnplannedItem = function(code) {
+      sheetItems = sheetItems.filter(i => i.code !== code);
+      if (currentSheet) {
+        currentSheet.total_accepted_qty = sheetItems.reduce((acc, i) => acc + (i.accepted_qty || 0), 0);
+      }
+
+      syncQueue.push({
+        code: code,
+        barcode: '',
+        qty: 0,
+        client_time: new Date().toISOString()
+      });
+
+      saveLocalState();
+      renderAcceptanceItems();
+      updateSheetProgress();
+      triggerSync();
+      refocusScanner();
+    };
+
+    window.setItemQtyDirectly = function(code, newQty) {
+      if (currentSheet && currentSheet.status === 'completed') {
+        alert('Этот лист заархивирован. Редактирование заблокировано.');
+        renderAcceptanceItems();
+        return;
+      }
+      const it = sheetItems.find(i => i.code === code);
+      if (!it) return;
+      const val = Math.max(0, parseInt(newQty, 10) || 0);
+
+      // If this was an unplanned / excess item and user set its accepted qty to 0, remove it completely
+      if ((it.expected_qty === 0 || it.num === '+') && val === 0) {
+        removeUnplannedItem(code);
+        return;
+      }
+
+      if (it.accepted_qty === val) return;
+
+      it.accepted_qty = val;
+      currentSheet.total_accepted_qty = sheetItems.reduce((acc, i) => acc + (i.accepted_qty || 0), 0);
+
+      syncQueue.push({
+        code: it.code,
+        barcode: '',
+        qty: val,
+        client_time: new Date().toISOString()
+      });
+
+      saveLocalState();
+      renderAcceptanceItems();
+      updateSheetProgress();
+      triggerSync();
+      refocusScanner();
+    };
+
+    // Complete packing
+    document.getElementById('btnCompletePacking').addEventListener('click', async () => {
+      if (!currentSheet) return;
+
+      const totalExpected = currentSheet.total_expected_qty || 0;
+      const totalAccepted = currentSheet.total_accepted_qty || 0;
+      let confirmMsg = `Завершить приёмку листа "${currentSheet.original_name}"? Он будет перемещен в принятые.`;
+
+      if (totalAccepted < totalExpected) {
+        const remaining = totalExpected - totalAccepted;
+        confirmMsg = `⚠️ Внимание: приёмка выполнена НЕ полностью!\nПринято: ${totalAccepted} из ${totalExpected} шт (не хватает ${remaining} шт).\n\nВы действительно хотите завершить приёмку с расхождениями?`;
+      }
+
+      if (!confirm(confirmMsg)) {
+        return;
+      }
+
+      await triggerSync(); // Flush pending queue first
+
+      try {
+        const completedId = currentSheet.id;
+        const formData = new FormData();
+        formData.append('action', 'complete');
+        formData.append('list_id', completedId);
+        const res = await fetch('/api/packing_lists.php', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+          alert('✓ Приёмка успешно завершена и заархивирована!');
+          // Clear active sheet from state and storage so it doesn't reopen on F5
+          localStorage.removeItem('warehouse_active_sheet_id');
+          localStorage.removeItem(`warehouse_sheet_${completedId}`);
+          localStorage.setItem('warehouse_active_tab', 'sheets');
+          currentSheet = null;
+          sheetItems = [];
+          updateSheetProgress();
+          renderAcceptanceItems();
+          switchTab('sheets');
+        } else {
+          alert('Ошибка: ' + data.error);
+        }
+      } catch (err) {
+        alert('Сетевая ошибка: ' + err.message);
+      }
+    });
+
+    // --- PACKING SHEETS TAB ---
+    async function loadPackingSheetsList() {
+      const container = document.getElementById('sheetsListContainer');
+      container.innerHTML = '<div style="text-align:center; padding: 20px;">Загрузка...</div>';
+
+      try {
+        const res = await fetch('/api/packing_lists.php?action=list');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+
+        if (data.lists.length === 0) {
+          container.innerHTML = '<div style="text-align:center; padding: 30px; color: var(--text-muted);">Нет загруженных упаковочных листов. Нажмите «+ Загрузить Excel».</div>';
+          return;
+        }
+
+        let html = '';
+        data.lists.forEach(l => {
+          let statusBadge = '<span class="sheet-status-tag" style="background:#fef3c7; color:#b45309;">Новый</span>';
+          if (l.status === 'in_progress') {
+            statusBadge = '<span class="sheet-status-tag" style="background:#dbeafe; color:#1d4ed8;">В процессе</span>';
+          } else if (l.status === 'completed') {
+            statusBadge = '<span class="sheet-status-tag" style="background:#dcfce7; color:#15803d;">✓ Принят</span>';
+          }
+
+          const percent = l.total_expected_qty > 0 ? Math.round((l.total_accepted_qty / l.total_expected_qty) * 100) : 0;
+
+          html += `
+            <div class="sheet-card">
+              <div class="sheet-card-header">
+                <strong style="font-size:15px;">${l.original_name}</strong>
+                ${statusBadge}
+              </div>
+              <div style="font-size:13px; color:var(--text-muted);">
+                Позиций: ${l.total_items} • Принято: ${l.total_accepted_qty} из ${l.total_expected_qty} шт (${percent}%)
+              </div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width: ${percent}%;"></div>
+              </div>
+              <div class="sheet-actions">
+                ${l.status !== 'completed' ? `
+                  <button class="btn btn-primary" onclick="openSheetForAcceptance(${l.id}, true)">
+                    ▶ Принять
+                  </button>
+                ` : `
+                  <button class="btn btn-secondary" onclick="openSheetForAcceptance(${l.id}, true)">
+                    Просмотр
+                  </button>
+                  <button class="btn btn-warning" onclick="resetSheetAcceptance(${l.id})">
+                    ↺ Перепринять
+                  </button>
+                  <a href="/api/packing_lists.php?action=export_report&list_id=${l.id}" class="btn btn-success" style="text-decoration:none;">
+                    📊 Акт Excel
+                  </a>
+                `}
+                <button class="btn btn-danger" onclick="deleteSheet(${l.id})">
+                  🗑 Удалить
+                </button>
+              </div>
+            </div>
+          `;
+        });
+
+        container.innerHTML = html;
+      } catch (err) {
+        container.innerHTML = `<div style="color:var(--danger); padding:20px;">Ошибка загрузки: ${err.message}</div>`;
+      }
+    }
+
+    window.openSheetForAcceptance = async function(listId, isUserInitiated = true) {
+      try {
+        const res = await fetch(`/api/packing_lists.php?action=get_items&id=${listId}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+
+        currentSheet = data.list;
+
+        // If the sheet is completed:
+        if (currentSheet.status === 'completed') {
+          // Never leave a completed sheet as the active auto-restore sheet
+          localStorage.removeItem('warehouse_active_sheet_id');
+          localStorage.removeItem(`warehouse_sheet_${listId}`);
+
+          // If restoring from page reload / F5, do not open completed sheet, stay on sheets list
+          if (!isUserInitiated) {
+            currentSheet = null;
+            sheetItems = [];
+            switchTab('sheets');
+            return;
+          }
+        } else {
+          // Only remember as active for reload if it's currently in progress
+          localStorage.setItem('warehouse_active_sheet_id', listId);
+        }
+
+        // Safety filter to ensure header rows and 0-qty unplanned items never get rendered
+        sheetItems = (data.items || []).filter(it => {
+          const c = (it.code || '').trim().toLowerCase();
+          const n = (it.name || '').trim().toLowerCase();
+          if (c === 'код' || c === 'code' || n === 'название' || n === 'наименование') return false;
+          if (Number(it.expected_qty) === 0 && Number(it.accepted_qty) === 0) return false;
+          return true;
+        });
+
+        // Build fast local barcode map
+        barcodeMap.clear();
+        data.barcodes.forEach(bc => {
+          barcodeMap.set(bc.barcode, {
+            supplier_code: bc.supplier_code,
+            name: bc.name,
+            box_qty: Number(bc.quantity) || 1,
+            packaging_type: bc.packaging_type || 'Штука',
+            place: bc.place || ''
+          });
+        });
+
+        if (currentSheet.status !== 'completed') {
+          saveLocalState();
+        }
+        switchTab('acceptance');
+        updateSheetProgress();
+        renderAcceptanceItems();
+      } catch (err) {
+        console.error('Failed to open sheet:', err);
+        localStorage.removeItem('warehouse_active_sheet_id');
+        switchTab('sheets');
+      }
+    };
+
+    window.resetSheetAcceptance = async function(listId) {
+      if (!confirm('Вы уверены, что хотите сбросить приёмку и перепринять лист заново? Все счетчики будут обнулены.')) {
+        return;
+      }
+      try {
+        const fd = new FormData();
+        fd.append('action', 'reset');
+        fd.append('list_id', listId);
+        const res = await fetch('/api/packing_lists.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+          alert('✓ Приёмка сброшена. Теперь можно начать заново.');
+          localStorage.removeItem('warehouse_active_sheet_id');
+          localStorage.removeItem(`warehouse_sheet_${listId}`);
+          if (currentSheet && currentSheet.id === listId) {
+            currentSheet = null;
+            sheetItems = [];
+            updateSheetProgress();
+            renderAcceptanceItems();
+          }
+          loadPackingSheetsList();
+        } else {
+          alert('Ошибка: ' + data.error);
+        }
+      } catch (err) {
+        alert('Ошибка: ' + err.message);
+      }
+    };
+
+    window.deleteSheet = async function(listId) {
+      if (!confirm('Удалить этот упаковочный лист и все связанные с ним данные?')) return;
+      try {
+        const fd = new FormData();
+        fd.append('action', 'delete');
+        fd.append('list_id', listId);
+        const res = await fetch('/api/packing_lists.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+          localStorage.removeItem('warehouse_active_sheet_id');
+          localStorage.removeItem(`warehouse_sheet_${listId}`);
+          if (currentSheet && currentSheet.id === listId) {
+            currentSheet = null;
+            sheetItems = [];
+            updateSheetProgress();
+            renderAcceptanceItems();
+          }
+          loadPackingSheetsList();
+        } else {
+          alert('Ошибка: ' + data.error);
+        }
+      } catch (err) {
+        alert('Ошибка: ' + err.message);
+      }
+    };
+
+    // Upload new sheet
+    const fileUploadInput = document.getElementById('fileUploadInput');
+    document.getElementById('btnUploadSheet').addEventListener('click', () => {
+      fileUploadInput.value = '';
+      fileUploadInput.click();
+    });
+
+    fileUploadInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const fd = new FormData();
+      fd.append('action', 'upload');
+      fd.append('file', file);
+
+      try {
+        const res = await fetch('/api/packing_lists.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✓ Лист загружен! Позиций: ${data.items_count}, заявлено: ${data.total_qty} шт.`);
+          loadPackingSheetsList();
+          openSheetForAcceptance(data.list_id, true);
+        } else {
+          alert('Ошибка загрузки: ' + data.error);
+        }
+      } catch (err) {
+        alert('Ошибка загрузки файла: ' + err.message);
+      }
+    });
+
+    // --- LOCATION SEARCH TAB ---
+    const locationSearchInput = document.getElementById('locationSearchInput');
+    const btnLocationSearch = document.getElementById('btnLocationSearch');
+
+    function triggerLocationSearch() {
+      let val = locationSearchInput.value.trim();
+      if (val.endsWith('+ET')) {
+        val = val.replace(/\+ET$/, '').trim();
+        locationSearchInput.value = val;
+      }
+      if (!val) {
+        document.getElementById('locationResultContainer').innerHTML = '<div style="text-align:center; padding: 40px 20px; color: var(--text-muted);">Отсканируйте штрихкод или введите артикул и нажмите Enter для поиска ячейки</div>';
+        return;
+      }
+      locationSearchInput.select();
+      performLocationSearch(val);
+    }
+
+    // Hardware scanner input with +ET suffix (instant trigger without waiting for Enter)
+    locationSearchInput.addEventListener('input', (e) => {
+      let val = e.target.value;
+      if (val.endsWith('+ET')) {
+        let cleanVal = val.replace(/\+ET$/, '').trim();
+        locationSearchInput.value = cleanVal;
+        locationSearchInput.select();
+        performLocationSearch(cleanVal);
+      } else if (!val.trim()) {
+        document.getElementById('locationResultContainer').innerHTML = '<div style="text-align:center; padding: 40px 20px; color: var(--text-muted);">Отсканируйте штрихкод или введите артикул и нажмите Enter для поиска ячейки</div>';
+      }
+      // Note: No search while typing codes or names without Enter or +ET
+    });
+
+    // Enter keydown for manual barcode, code/article, or scanner with Enter suffix
+    locationSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        triggerLocationSearch();
+      }
+    });
+
+    if (btnLocationSearch) {
+      btnLocationSearch.addEventListener('click', () => {
+        triggerLocationSearch();
+      });
+    }
+
+    locationSearchInput.addEventListener('focus', () => {
+      locationSearchInput.select();
+    });
+
+    async function performLocationSearch(rawQuery) {
+      const query = (rawQuery || '').replace(/\+ET$/, '').trim();
+      if (!query) return;
+      const container = document.getElementById('locationResultContainer');
+      container.innerHTML = '<div style="text-align:center; padding: 20px;">Поиск...</div>';
+
+      try {
+        const res = await fetch(`/api/search.php?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+
+        if (!data.results || data.results.length === 0) {
+          playSound('error');
+          container.innerHTML = `<div style="text-align:center; padding:30px; color:var(--danger); font-size:16px;">По запросу "${query}" ничего не найдено</div>`;
+          return;
+        }
+
+        playSound('success');
+        let html = '';
+        data.results.forEach(r => {
+          let barcodesHtml = '';
+          if (r.all_barcodes && r.all_barcodes.length > 0) {
+            r.all_barcodes.forEach(bc => {
+              barcodesHtml += `
+                <div class="location-pack-item">
+                  <span>${bc.packaging_type || 'Упаковка'}: <strong>${bc.quantity} шт</strong></span>
+                  <span style="font-family:monospace;">${bc.barcode}</span>
+                </div>
+              `;
+            });
+          }
+
+          html += `
+            <div style="background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:12px; margin-bottom:10px;">
+              <div style="font-size:12px; color:var(--text-muted); text-transform:uppercase;">${r.manufacturer || 'Без бренда'}</div>
+              <div style="font-size:16px; font-weight:700; margin:2px 0;">${r.name}</div>
+              <div style="font-size:13px; font-family:monospace; color:#475569; margin-bottom:6px;">Артикул: ${r.supplier_code} ${r.our_code ? `• Наш код: ${r.our_code}` : ''}</div>
+              
+              <div class="location-display">
+                <div style="font-size:12px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px;">МЕСТО ХРАНЕНИЯ</div>
+                <div class="location-place-huge">${r.place || 'НЕ НАЗНАЧЕНО'}</div>
+              </div>
+
+              ${barcodesHtml ? `
+                <div style="font-size:12px; font-weight:700; margin-top:8px; color:#475569;">Привязанные штрихкоды и фасовки:</div>
+                <div class="location-packings-list">${barcodesHtml}</div>
+              ` : ''}
+            </div>
+          `;
+        });
+
+        container.innerHTML = html;
+      } catch (err) {
+        container.innerHTML = `<div style="color:var(--danger); padding:20px;">Ошибка поиска: ${err.message}</div>`;
+      }
+    }
+
+    // --- BARCODE DATABASE TAB ---
+    async function loadDatabaseTab() {
+      try {
+        const statsRes = await fetch('/api/import_export.php?action=stats');
+        const statsData = await statsRes.json();
+        if (statsData.success) {
+          document.getElementById('dbStatsText').innerHTML = `
+            Товаров в базе: <strong>${statsData.stats.products}</strong><br/>
+            Штрихкодов: <strong>${statsData.stats.barcodes}</strong><br/>
+            Производителей: <strong>${statsData.stats.manufacturers}</strong>
+          `;
+        }
+
+        const mRes = await fetch('/api/barcodes.php?action=manufacturers');
+        const mData = await mRes.json();
+        if (mData.success) {
+          const sel = document.getElementById('dbManufacturerSelect');
+          sel.innerHTML = '<option value="">-- Все производители --</option>';
+          mData.manufacturers.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            sel.appendChild(opt);
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load DB stats', err);
+      }
+    }
+
+    // Upload & Merge Excel
+    const dbExcelUploadInput = document.getElementById('dbExcelUploadInput');
+    document.getElementById('btnImportExcel').addEventListener('click', () => {
+      dbExcelUploadInput.value = '';
+      dbExcelUploadInput.click();
+    });
+
+    dbExcelUploadInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!confirm(`Импортировать файл "${file.name}" в базу данных? Новые штрихкоды и товары будут добавлены, существующие обновлены.`)) {
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append('action', 'import');
+      fd.append('mode', 'merge');
+      fd.append('excel_file', file);
+
+      try {
+        const res = await fetch('/api/import_export.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✓ Импорт успешно завершен!\nДобавлено товаров: ${data.stats.added_products}\nОбновлено: ${data.stats.updated_products}\nДобавлено штрихкодов: ${data.stats.added_barcodes}`);
+          loadDatabaseTab();
+        } else {
+          alert('Ошибка импорта: ' + data.error);
+        }
+      } catch (err) {
+        alert('Ошибка при импорте Excel: ' + err.message);
+      }
+    });
+
+    // Manufacturer filter in DB tab
+    document.getElementById('dbManufacturerSelect').addEventListener('change', async (e) => {
+      const m = e.target.value;
+      const container = document.getElementById('dbProductsListContainer');
+      if (!m) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = '<div style="text-align:center; padding:20px;">Загрузка товаров...</div>';
+      try {
+        const res = await fetch(`/api/barcodes.php?action=by_manufacturer&manufacturer=${encodeURIComponent(m)}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+
+        let html = '';
+        data.products.forEach(p => {
+          html += `
+            <div class="item-card">
+              <div class="item-header">
+                <span class="item-code">${p.supplier_code}</span>
+                <span class="item-place">${p.place || 'Без места'}</span>
+              </div>
+              <div class="item-name">${p.name}</div>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
+                Штрихкодов: ${p.barcodes ? p.barcodes.length : 0}
+              </div>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+      } catch (err) {
+        container.innerHTML = `<div style="color:var(--danger); padding:10px;">Ошибка: ${err.message}</div>`;
+      }
+    });
+
+    // --- INITIALIZATION ---
+    document.addEventListener('DOMContentLoaded', () => {
+      applyTsdMode(true);
+      loadLocalState();
+      
+      const activeSheetId = localStorage.getItem('warehouse_active_sheet_id');
+      if (activeSheetId) {
+        openSheetForAcceptance(activeSheetId, false);
+      } else {
+        const lastTab = localStorage.getItem('warehouse_active_tab') || 'sheets';
+        switchTab(lastTab === 'acceptance' ? 'sheets' : lastTab);
+      }
+    });
+  </script>
+</body>
+</html>
