@@ -58,24 +58,24 @@
 2. Вставьте содержимое файла `docker-compose.yml`:
    ```yaml
    services:
-     warehouse:
+     warehouse-v2:
        build:
          context: https://github.com/ВАШ_АККАУНТ/warehouse-app.git#main
          dockerfile: Dockerfile
-       container_name: warehouse-acceptance
+       container_name: warehouse-v2
        restart: unless-stopped
        ports:
          - "8070:80"
        volumes:
-         - warehouse_data:/var/warehouse_data
+         - warehouse_data_v2:/var/warehouse_data
        environment:
          - APACHE_RUN_USER=www-data
          - APACHE_RUN_GROUP=www-data
          - DATA_PATH=/var/warehouse_data
 
    volumes:
-     warehouse_data:
-       name: warehouse_storage
+     warehouse_data_v2:
+       name: warehouse_storage_v2
    ```
 3. Нажмите **Deploy the stack**.
 
