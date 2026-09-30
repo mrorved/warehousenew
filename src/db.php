@@ -64,13 +64,45 @@ function initSchema(PDO $pdo) {
     $pdo->exec("CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         our_code TEXT,
-        supplier_code TEXT NOT NULL UNIQUE,
+        supplier_code TEXT,
         name TEXT NOT NULL,
         place TEXT,
         manufacturer TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );");
+
+    // Migration check: If existing table has NOT NULL on supplier_code, migrate it
+    try {
+        $cols = $pdo->query("PRAGMA table_info(products)")->fetchAll();
+        $supplierNotNull = false;
+        foreach ($cols as $col) {
+            if ($col['name'] === 'supplier_code' && !empty($col['notnull'])) {
+                $supplierNotNull = true;
+                break;
+            }
+        }
+        if ($supplierNotNull) {
+            $pdo->exec("PRAGMA foreign_keys = OFF;");
+            $pdo->exec("CREATE TABLE products_v2_mig (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                our_code TEXT,
+                supplier_code TEXT,
+                name TEXT NOT NULL,
+                place TEXT,
+                manufacturer TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );");
+            $pdo->exec("INSERT INTO products_v2_mig (id, our_code, supplier_code, name, place, manufacturer, created_at, updated_at)
+                        SELECT id, our_code, supplier_code, name, place, manufacturer, created_at, updated_at FROM products;");
+            $pdo->exec("DROP TABLE products;");
+            $pdo->exec("ALTER TABLE products_v2_mig RENAME TO products;");
+            $pdo->exec("PRAGMA foreign_keys = ON;");
+        }
+    } catch (Exception $e) {
+        error_log('Migration warning: ' . $e->getMessage());
+    }
 
     // 2. Barcodes table (1 product -> many packaging types / barcodes)
     $pdo->exec("CREATE TABLE IF NOT EXISTS product_barcodes (
@@ -122,6 +154,7 @@ function initSchema(PDO $pdo) {
     );");
 
     // Indexes for fast lookups
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_products_supplier_code ON products(supplier_code);");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_products_our_code ON products(our_code);");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_products_manufacturer ON products(manufacturer);");

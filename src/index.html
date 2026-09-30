@@ -609,27 +609,79 @@
 
     <!-- 4. BARCODE DATABASE & EXCEL TAB -->
     <div id="tab-database" class="tab-view" style="display:none;">
-      <h3 style="margin-bottom: 8px;">⚙️ База штрихкодов</h3>
+      <h3 style="margin-bottom: 8px;">⚙️ База товаров и штрихкодов</h3>
       
-      <div style="background:#fff; padding:12px; border-radius:var(--radius); border:1px solid var(--border); margin-bottom:12px;">
-        <div style="font-weight:700; margin-bottom:6px;">Синхронизация через Excel:</div>
-        <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">
-          Вы можете скачать полную базу в Excel, добавить новые штрихкоды или товары и залить обратно.
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <a href="/api/import_export.php?action=export" class="btn btn-secondary" style="flex:1; text-decoration:none;">
-            📥 Скачать базу (.xlsx)
-          </a>
-          <button class="btn btn-primary" id="btnImportExcel" style="flex:1;">
-            📤 Залить Excel (Merge)
-          </button>
-          <input type="file" id="dbExcelUploadInput" accept=".xlsx,.xls" style="display:none;" />
+      <!-- Live Stats Grid -->
+      <div style="background:#fff; padding:12px; border-radius:var(--radius); border:1px solid var(--border); margin-bottom:12px;" id="dbStatsBox">
+        <div style="font-weight:700; margin-bottom:6px; font-size:14px;">📊 Состояние базы:</div>
+        <div id="dbStatsText" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:13px; color:#334155;">
+          <div style="background:#f8fafc; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0;">
+            📦 Товаров: <strong id="statProdCount" style="color:#0f172a;">—</strong>
+          </div>
+          <div style="background:#f8fafc; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0;">
+            📍 С ячейками: <strong id="statPlaceCount" style="color:#16a34a;">—</strong>
+          </div>
+          <div style="background:#f8fafc; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0;">
+            🏷️ Штрихкодов: <strong id="statBcCount" style="color:#2563eb;">—</strong>
+          </div>
+          <div style="background:#f8fafc; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0;">
+            🏭 Брендов: <strong id="statMfrCount" style="color:#7c3aed;">—</strong>
+          </div>
         </div>
       </div>
 
-      <div style="background:#fff; padding:12px; border-radius:var(--radius); border:1px solid var(--border); margin-bottom:12px;" id="dbStatsBox">
-        <div style="font-weight:700; margin-bottom:4px;">Статистика базы:</div>
-        <div style="font-size:13px; color:#475569;" id="dbStatsText">Загрузка данных...</div>
+      <!-- Import Cards from 1C -->
+      <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;">
+        
+        <!-- Card 1: Places & Nomenclature -->
+        <div style="background:#fff; padding:12px; border-radius:var(--radius); border:1px solid #cbd5e1; border-left:4px solid #16a34a;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+            <div style="font-weight:700; font-size:14px; color:#14532d;">📍 1. Адреса ячеек и номенклатура</div>
+          </div>
+          <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px; line-height:1.4;">
+            Файл из 1С: <code>Код</code>, <code>Код Гарда</code>, <code>Номенклатура</code>, <code>Привязанная ячейка</code>.<br/>
+            Обновляет адреса полок и карточки. <strong>Штрихкоды не затрагиваются!</strong>
+          </div>
+          <button class="btn" id="btnImportPlaces" style="width:100%; background:#16a34a; color:#fff; border:none; padding:10px; font-weight:600; border-radius:6px; cursor:pointer;">
+            📍 Загрузить ячейки (.xlsx)
+          </button>
+          <input type="file" id="placesUploadInput" accept=".xlsx,.xls,.csv" style="display:none;" />
+        </div>
+
+        <!-- Card 2: Barcodes & Packaging -->
+        <div style="background:#fff; padding:12px; border-radius:var(--radius); border:1px solid #cbd5e1; border-left:4px solid #2563eb;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+            <div style="font-weight:700; font-size:14px; color:#1e3a8a;">🏷️ 2. Реестр штрихкодов и упаковок</div>
+          </div>
+          <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px; line-height:1.4;">
+            Файл из 1С: <code>Штрихкод</code>, <code>Номенклатура</code>, <code>Производитель</code>, <code>Единица</code>, <code>Количество</code>.<br/>
+            Добавляет штуки, минибоксы, упаковки и кратности.
+          </div>
+          <button class="btn btn-primary" id="btnImportBarcodes" style="width:100%; padding:10px; font-weight:600; border-radius:6px; cursor:pointer;">
+            🏷️ Загрузить штрихкоды (.xlsx)
+          </button>
+          <input type="file" id="barcodesUploadInput" accept=".xlsx,.xls,.csv" style="display:none;" />
+        </div>
+
+        <!-- Card 3: Backup & Legacy Merge -->
+        <div style="background:#f8fafc; padding:10px; border-radius:var(--radius); border:1px dashed #cbd5e1;">
+          <div style="font-size:12px; color:#64748b; margin-bottom:8px; font-weight:600;">Резервная копия и полный архив:</div>
+          <div style="display:flex; gap:8px;">
+            <a href="/api/import_export.php?action=export" class="btn btn-secondary" style="flex:1; text-align:center; text-decoration:none; font-size:12px; padding:8px;">
+              📥 Скачать базу
+            </a>
+            <button class="btn btn-secondary" id="btnImportExcel" style="flex:1; font-size:12px; padding:8px;">
+              📤 Полный Excel
+            </button>
+            <input type="file" id="dbExcelUploadInput" accept=".xlsx,.xls" style="display:none;" />
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Loading overlay banner during import -->
+      <div id="dbImportLoading" style="display:none; background:#eff6ff; border:1px solid #3b82f6; color:#1e40af; padding:12px; border-radius:8px; text-align:center; font-weight:700; font-size:14px; margin-bottom:12px;">
+        ⏳ Обработка файла и синхронизация с базой... Пожалуйста, подождите.
       </div>
 
       <div style="margin-bottom: 8px;">
@@ -943,13 +995,21 @@
 
       // 1. Instant lookup in local barcode map
       const barcodeInfo = barcodeMap.get(barcode);
-      let targetCode = barcodeInfo ? barcodeInfo.supplier_code : barcode;
+      let targetCode = barcodeInfo ? (barcodeInfo.supplier_code || barcodeInfo.our_code || barcodeInfo.name) : barcode;
       let qtyToAdd = barcodeInfo ? barcodeInfo.box_qty : 1;
       let packType = barcodeInfo ? barcodeInfo.packaging_type : 'Штука';
       let place = barcodeInfo ? barcodeInfo.place : '';
 
       // 2. Find in current sheet
-      let item = sheetItems.find(it => it.code === targetCode || it.code === barcode);
+      let item = sheetItems.find(it => 
+        it.code === targetCode || 
+        it.code === barcode || 
+        (barcodeInfo && (
+          (barcodeInfo.our_code && it.code === barcodeInfo.our_code) ||
+          (barcodeInfo.supplier_code && it.code === barcodeInfo.supplier_code) ||
+          (barcodeInfo.name && it.name === barcodeInfo.name)
+        ))
+      );
 
       if (!item) {
         // If not found in sheet, check if product is known in DB
@@ -1353,8 +1413,9 @@
         barcodeMap.clear();
         data.barcodes.forEach(bc => {
           barcodeMap.set(bc.barcode, {
-            supplier_code: bc.supplier_code,
-            name: bc.name,
+            supplier_code: bc.supplier_code || '',
+            our_code: bc.our_code || '',
+            name: bc.name || '',
             box_qty: Number(bc.quantity) || 1,
             packaging_type: bc.packaging_type || 'Штука',
             place: bc.place || ''
@@ -1572,11 +1633,11 @@
         const statsRes = await fetch('/api/import_export.php?action=stats');
         const statsData = await statsRes.json();
         if (statsData.success) {
-          document.getElementById('dbStatsText').innerHTML = `
-            Товаров в базе: <strong>${statsData.stats.products}</strong><br/>
-            Штрихкодов: <strong>${statsData.stats.barcodes}</strong><br/>
-            Производителей: <strong>${statsData.stats.manufacturers}</strong>
-          `;
+          const s = statsData.stats;
+          document.getElementById('statProdCount').textContent = (s.products || 0).toLocaleString();
+          document.getElementById('statPlaceCount').textContent = (s.products_with_place || 0).toLocaleString();
+          document.getElementById('statBcCount').textContent = (s.barcodes || 0).toLocaleString();
+          document.getElementById('statMfrCount').textContent = (s.manufacturers || 0).toLocaleString();
         }
 
         const mRes = await fetch('/api/barcodes.php?action=manufacturers');
@@ -1596,7 +1657,89 @@
       }
     }
 
-    // Upload & Merge Excel
+    // Helper to toggle import loading banner
+    function setImportLoading(show, message) {
+      const banner = document.getElementById('dbImportLoading');
+      if (!banner) return;
+      if (show) {
+        banner.style.display = 'block';
+        banner.textContent = message || '⏳ Обработка файла и синхронизация с базой... Пожалуйста, подождите.';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+
+    // 1. Upload Places & Nomenclature (File 1 from 1C)
+    const placesUploadInput = document.getElementById('placesUploadInput');
+    document.getElementById('btnImportPlaces').addEventListener('click', () => {
+      placesUploadInput.value = '';
+      placesUploadInput.click();
+    });
+
+    placesUploadInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!confirm(`Импортировать справочник ячеек и товаров из файла "${file.name}"?\nАдреса ячеек будут обновлены, привязанные штрихкоды останутся нетронутыми.`)) {
+        return;
+      }
+
+      setImportLoading(true, `⏳ Загрузка и обработка ячеек из "${file.name}"... Это может занять несколько секунд.`);
+      const fd = new FormData();
+      fd.append('file', file);
+
+      try {
+        const res = await fetch('/api/import_export.php?action=import_places', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✓ Справочник ячеек успешно обработан!\nВсего строк: ${data.stats.total_rows.toLocaleString()}\nОбновлено товаров: ${data.stats.updated_products.toLocaleString()}\nСоздано новых: ${data.stats.added_products.toLocaleString()}`);
+          loadDatabaseTab();
+        } else {
+          alert('Ошибка импорта ячеек: ' + (data.error || 'Неизвестная ошибка'));
+        }
+      } catch (err) {
+        alert('Ошибка при импорте ячеек: ' + err.message);
+      } finally {
+        setImportLoading(false);
+      }
+    });
+
+    // 2. Upload Barcodes & Packaging (File 2 from 1C)
+    const barcodesUploadInput = document.getElementById('barcodesUploadInput');
+    document.getElementById('btnImportBarcodes').addEventListener('click', () => {
+      barcodesUploadInput.value = '';
+      barcodesUploadInput.click();
+    });
+
+    barcodesUploadInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!confirm(`Импортировать реестр штрихкодов и упаковок из файла "${file.name}"?\nБудут добавлены новые штрихкоды и кратности упаковок.`)) {
+        return;
+      }
+
+      setImportLoading(true, `⏳ Загрузка реестра штрихкодов из "${file.name}"... Это может занять несколько секунд.`);
+      const fd = new FormData();
+      fd.append('file', file);
+
+      try {
+        const res = await fetch('/api/import_export.php?action=import_barcodes', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✓ Реестр штрихкодов успешно загружен!\nВсего строк: ${data.stats.total_rows.toLocaleString()}\nДобавлено новых ШК: ${data.stats.added_barcodes.toLocaleString()}\nОбновлено ШК: ${data.stats.updated_barcodes.toLocaleString()}\nСоздано карточек товаров: ${data.stats.new_products.toLocaleString()}`);
+          loadDatabaseTab();
+        } else {
+          alert('Ошибка импорта штрихкодов: ' + (data.error || 'Неизвестная ошибка'));
+        }
+      } catch (err) {
+        alert('Ошибка при импорте штрихкодов: ' + err.message);
+      } finally {
+        setImportLoading(false);
+      }
+    });
+
+    // 3. Upload & Merge Full Excel (Legacy round-trip)
     const dbExcelUploadInput = document.getElementById('dbExcelUploadInput');
     document.getElementById('btnImportExcel').addEventListener('click', () => {
       dbExcelUploadInput.value = '';
@@ -1607,10 +1750,11 @@
       const file = e.target.files[0];
       if (!file) return;
 
-      if (!confirm(`Импортировать файл "${file.name}" в базу данных? Новые штрихкоды и товары будут добавлены, существующие обновлены.`)) {
+      if (!confirm(`Импортировать полный файл "${file.name}" в базу данных? Новые штрихкоды и товары будут добавлены, существующие обновлены.`)) {
         return;
       }
 
+      setImportLoading(true, `⏳ Обработка файла "${file.name}"...`);
       const fd = new FormData();
       fd.append('action', 'import');
       fd.append('mode', 'merge');
@@ -1627,6 +1771,8 @@
         }
       } catch (err) {
         alert('Ошибка при импорте Excel: ' + err.message);
+      } finally {
+        setImportLoading(false);
       }
     });
 
@@ -1647,15 +1793,28 @@
 
         let html = '';
         data.products.forEach(p => {
+          const codes = [];
+          if (p.our_code) codes.push(`Код: ${p.our_code}`);
+          if (p.supplier_code && p.supplier_code !== p.our_code) codes.push(`Гарда: ${p.supplier_code}`);
+          const codeLabel = codes.length > 0 ? codes.join(' | ') : 'Без кода';
+
+          const bcBadges = (p.barcodes && p.barcodes.length > 0)
+            ? p.barcodes.map(b => `
+                <span style="font-size:11px; background:#f8fafc; border:1px solid #cbd5e1; padding:2px 6px; border-radius:4px; font-family:monospace; white-space:nowrap;">
+                  ${b.barcode} <strong style="color:#2563eb;">(${b.packaging_type || 'Штука'}: ${b.quantity} шт)</strong>
+                </span>
+              `).join('')
+            : '<span style="font-size:11px; color:#94a3b8;">Нет штрихкодов</span>';
+
           html += `
             <div class="item-card">
               <div class="item-header">
-                <span class="item-code">${p.supplier_code}</span>
+                <span class="item-code">${codeLabel}</span>
                 <span class="item-place">${p.place || 'Без места'}</span>
               </div>
               <div class="item-name">${p.name}</div>
-              <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
-                Штрихкодов: ${p.barcodes ? p.barcodes.length : 0}
+              <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
+                ${bcBadges}
               </div>
             </div>
           `;

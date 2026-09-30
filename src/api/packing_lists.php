@@ -52,7 +52,7 @@ try {
                 COALESCE(p.place, '') as place,
                 COALESCE(p.manufacturer, '') as manufacturer
             FROM packing_items pi
-            LEFT JOIN products p ON pi.code = p.supplier_code
+            LEFT JOIN products p ON (pi.code = p.supplier_code OR pi.code = p.our_code OR pi.name = p.name)
             WHERE pi.packing_list_id = ?
               AND (pi.expected_qty > 0 OR pi.accepted_qty > 0)
             ORDER BY CAST(pi.num AS INTEGER) ASC, pi.id ASC
@@ -67,6 +67,7 @@ try {
                 pb.quantity,
                 pb.packaging_type,
                 p.supplier_code,
+                p.our_code,
                 p.name,
                 p.place
             FROM product_barcodes pb
@@ -362,7 +363,7 @@ try {
         $itemsStmt = $pdo->prepare("
             SELECT pi.*, p.place, p.our_code 
             FROM packing_items pi
-            LEFT JOIN products p ON pi.code = p.supplier_code
+            LEFT JOIN products p ON (pi.code = p.supplier_code OR pi.code = p.our_code OR pi.name = p.name)
             WHERE pi.packing_list_id = ?
             ORDER BY CAST(pi.num AS INTEGER) ASC
         ");
