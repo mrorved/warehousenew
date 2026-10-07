@@ -663,17 +663,27 @@
           <input type="file" id="barcodesUploadInput" accept=".xlsx,.xls,.csv" style="display:none;" />
         </div>
 
-        <!-- Card 3: Backup & Legacy Merge -->
-        <div style="background:#f8fafc; padding:10px; border-radius:var(--radius); border:1px dashed #cbd5e1;">
-          <div style="font-size:12px; color:#64748b; margin-bottom:8px; font-weight:600;">Резервная копия и полный архив:</div>
-          <div style="display:flex; gap:8px;">
-            <a href="/api/import_export.php?action=export" class="btn btn-secondary" style="flex:1; text-align:center; text-decoration:none; font-size:12px; padding:8px;">
-              📥 Скачать базу
-            </a>
-            <button class="btn btn-secondary" id="btnImportExcel" style="flex:1; font-size:12px; padding:8px;">
-              📤 Полный Excel
-            </button>
-            <input type="file" id="dbExcelUploadInput" accept=".xlsx,.xls" style="display:none;" />
+        <!-- Card 3: Backup & Reset -->
+        <div style="background:#f8fafc; padding:12px; border-radius:var(--radius); border:1px dashed #cbd5e1;">
+          <div style="font-size:12px; color:#475569; margin-bottom:8px; font-weight:700;">Резервные копии и сброс:</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:8px;">
+              <a href="/api/import_export.php?action=backup_db" class="btn btn-secondary" style="flex:1; text-align:center; text-decoration:none; font-size:12px; padding:8px 4px;">
+                💾 Скачать копию (.db)
+              </a>
+              <a href="/api/import_export.php?action=export" class="btn btn-secondary" style="flex:1; text-align:center; text-decoration:none; font-size:12px; padding:8px 4px;">
+                📊 Скачать Excel (.xlsx)
+              </a>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-secondary" id="btnImportExcel" style="flex:1; font-size:12px; padding:8px;">
+                📤 Залить Excel
+              </button>
+              <button class="btn btn-danger" id="btnClearDb" style="flex:1; font-size:12px; padding:8px; background:#dc2626; color:#fff; border:none; border-radius:6px; cursor:pointer;">
+                ⚠️ Очистить товары и ШК
+              </button>
+              <input type="file" id="dbExcelUploadInput" accept=".xlsx,.xls" style="display:none;" />
+            </div>
           </div>
         </div>
 
@@ -993,23 +1003,49 @@
         return;
       }
 
+      // Helper to strip leading zeros for comparison
+      function normCode(c) {
+        if (!c) return '';
+        const s = String(c).trim();
+        return s.replace(/^0+/, '') || '0';
+      }
+
       // 1. Instant lookup in local barcode map
-      const barcodeInfo = barcodeMap.get(barcode);
+      let barcodeInfo = barcodeMap.get(barcode);
+      // Fallback: If 14-digit ITF-14 box barcode (e.g. 24603869140667), extract EAN payload
+      if (!barcodeInfo && barcode.length === 14 && /^\d{14}$/.test(barcode)) {
+        const ean12 = barcode.slice(1, 13);
+        for (const [bc, info] of barcodeMap.entries()) {
+          if (bc.startsWith(ean12)) {
+            barcodeInfo = info;
+            break;
+          }
+        }
+      }
+
       let targetCode = barcodeInfo ? (barcodeInfo.supplier_code || barcodeInfo.our_code || barcodeInfo.name) : barcode;
       let qtyToAdd = barcodeInfo ? barcodeInfo.box_qty : 1;
       let packType = barcodeInfo ? barcodeInfo.packaging_type : 'Штука';
       let place = barcodeInfo ? barcodeInfo.place : '';
 
-      // 2. Find in current sheet
-      let item = sheetItems.find(it => 
-        it.code === targetCode || 
-        it.code === barcode || 
-        (barcodeInfo && (
-          (barcodeInfo.our_code && it.code === barcodeInfo.our_code) ||
-          (barcodeInfo.supplier_code && it.code === barcodeInfo.supplier_code) ||
-          (barcodeInfo.name && it.name === barcodeInfo.name)
-        ))
-      );
+      const normTarget = normCode(targetCode);
+      const normOur = barcodeInfo ? normCode(barcodeInfo.our_code) : '';
+      const normSup = barcodeInfo ? normCode(barcodeInfo.supplier_code) : '';
+      const normBc = normCode(barcode);
+
+      // 2. Find in current sheet with leading-zero normalization
+      let item = sheetItems.find(it => {
+        const normIt = normCode(it.code);
+        return (
+          (normTarget && normIt === normTarget) ||
+          (normBc && normIt === normBc) ||
+          (normOur && normIt === normOur) ||
+          (normSup && normIt === normSup) ||
+          (it.code === targetCode) ||
+          (it.code === barcode) ||
+          (barcodeInfo && barcodeInfo.name && it.name && it.name.trim().toLowerCase() === barcodeInfo.name.trim().toLowerCase())
+        );
+      });
 
       if (!item) {
         // If not found in sheet, check if product is known in DB
@@ -1775,6 +1811,41 @@
         setImportLoading(false);
       }
     });
+
+    // 4. Clear Database (Reset before clean re-import)
+    const btnClearDb = document.getElementById('btnClearDb');
+    if (btnClearDb) {
+      btnClearDb.addEventListener('click', async () => {
+        if (!confirm("⚠️ ВНИМАНИЕ!\n\nВы собираетесь полностью очистить справочник товаров и штрихкодов перед чистой перезаливкой.\n\nПеред этим обязательно сохраните резервную копию базы (.db) кнопкой выше!\nУпаковочные листы при этом останутся сохранены.\n\nВы действительно хотите очистить товары и штрихкоды?")) {
+          return;
+        }
+
+        const secondCheck = prompt("Для подтверждения введите слово 'ОЧИСТИТЬ':");
+        if (secondCheck !== 'ОЧИСТИТЬ' && secondCheck !== 'очистить') {
+          alert('Очистка отменена.');
+          return;
+        }
+
+        setImportLoading(true, '⏳ Очистка базы данных...');
+        const fd = new FormData();
+        fd.append('confirm', 'yes');
+
+        try {
+          const res = await fetch('/api/import_export.php?action=clear_database', { method: 'POST', body: fd });
+          const data = await res.json();
+          if (data.success) {
+            alert('✓ База товаров и штрихкодов успешно очищена!\nТеперь загрузите чистый файл ячеек и затем файл штрихкодов.');
+            loadDatabaseTab();
+          } else {
+            alert('Ошибка очистки: ' + data.error);
+          }
+        } catch (err) {
+          alert('Ошибка при очистке: ' + err.message);
+        } finally {
+          setImportLoading(false);
+        }
+      });
+    }
 
     // Manufacturer filter in DB tab
     document.getElementById('dbManufacturerSelect').addEventListener('change', async (e) => {

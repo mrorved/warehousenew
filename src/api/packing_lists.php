@@ -38,7 +38,7 @@ try {
             jsonError('Упаковочный лист не найден', 404);
         }
 
-        // Get items joined with products to fetch current place and our_code
+        // Get items joined with products to fetch current place and our_code (strictly 1:1 match)
         $itemsStmt = $pdo->prepare("
             SELECT 
                 pi.id,
@@ -48,16 +48,43 @@ try {
                 pi.expected_qty,
                 pi.accepted_qty,
                 pi.notes,
-                p.our_code,
-                COALESCE(p.place, '') as place,
-                COALESCE(p.manufacturer, '') as manufacturer
+                COALESCE(matched.our_code, '') as our_code,
+                COALESCE(matched.place, '') as place,
+                COALESCE(matched.manufacturer, '') as manufacturer
             FROM packing_items pi
-            LEFT JOIN products p ON (pi.code = p.supplier_code OR pi.code = p.our_code OR pi.name = p.name)
+            LEFT JOIN (
+                SELECT 
+                    pi2.id as pi_id,
+                    p2.place,
+                    p2.our_code,
+                    p2.manufacturer,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY pi2.id 
+                        ORDER BY 
+                            CASE 
+                                WHEN p2.supplier_code = pi2.code THEN 1
+                                WHEN (LTRIM(p2.supplier_code, '0') != '' AND LTRIM(p2.supplier_code, '0') = LTRIM(pi2.code, '0')) THEN 2
+                                WHEN p2.our_code = pi2.code THEN 3
+                                WHEN (LTRIM(p2.our_code, '0') != '' AND LTRIM(p2.our_code, '0') = LTRIM(pi2.code, '0')) THEN 4
+                                ELSE 5
+                            END ASC,
+                            p2.id DESC
+                    ) as rn
+                FROM packing_items pi2
+                JOIN products p2 ON (
+                    p2.supplier_code = pi2.code 
+                    OR p2.our_code = pi2.code 
+                    OR (LTRIM(p2.supplier_code, '0') != '' AND LTRIM(p2.supplier_code, '0') = LTRIM(pi2.code, '0'))
+                    OR (LTRIM(p2.our_code, '0') != '' AND LTRIM(p2.our_code, '0') = LTRIM(pi2.code, '0'))
+                    OR LOWER(TRIM(p2.name)) = LOWER(TRIM(pi2.name))
+                )
+                WHERE pi2.packing_list_id = ?
+            ) matched ON pi.id = matched.pi_id AND matched.rn = 1
             WHERE pi.packing_list_id = ?
               AND (pi.expected_qty > 0 OR pi.accepted_qty > 0)
-            ORDER BY CAST(pi.num AS INTEGER) ASC, pi.id ASC
+            ORDER BY CASE WHEN pi.num = '+' THEN 1 ELSE 0 END ASC, CAST(pi.num AS INTEGER) ASC, pi.id ASC
         ");
-        $itemsStmt->execute([$listId]);
+        $itemsStmt->execute([$listId, $listId]);
         $items = $itemsStmt->fetchAll();
 
         // Also fetch all barcodes for fast local client lookup
@@ -361,13 +388,42 @@ try {
         if (!$list) jsonError('Лист не найден');
 
         $itemsStmt = $pdo->prepare("
-            SELECT pi.*, p.place, p.our_code 
+            SELECT 
+                pi.*, 
+                COALESCE(matched.place, '') as place, 
+                COALESCE(matched.our_code, '') as our_code 
             FROM packing_items pi
-            LEFT JOIN products p ON (pi.code = p.supplier_code OR pi.code = p.our_code OR pi.name = p.name)
+            LEFT JOIN (
+                SELECT 
+                    pi2.id as pi_id,
+                    p2.place,
+                    p2.our_code,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY pi2.id 
+                        ORDER BY 
+                            CASE 
+                                WHEN p2.supplier_code = pi2.code THEN 1
+                                WHEN (LTRIM(p2.supplier_code, '0') != '' AND LTRIM(p2.supplier_code, '0') = LTRIM(pi2.code, '0')) THEN 2
+                                WHEN p2.our_code = pi2.code THEN 3
+                                WHEN (LTRIM(p2.our_code, '0') != '' AND LTRIM(p2.our_code, '0') = LTRIM(pi2.code, '0')) THEN 4
+                                ELSE 5
+                            END ASC,
+                            p2.id DESC
+                    ) as rn
+                FROM packing_items pi2
+                JOIN products p2 ON (
+                    p2.supplier_code = pi2.code 
+                    OR p2.our_code = pi2.code 
+                    OR (LTRIM(p2.supplier_code, '0') != '' AND LTRIM(p2.supplier_code, '0') = LTRIM(pi2.code, '0'))
+                    OR (LTRIM(p2.our_code, '0') != '' AND LTRIM(p2.our_code, '0') = LTRIM(pi2.code, '0'))
+                    OR LOWER(TRIM(p2.name)) = LOWER(TRIM(pi2.name))
+                )
+                WHERE pi2.packing_list_id = ?
+            ) matched ON pi.id = matched.pi_id AND matched.rn = 1
             WHERE pi.packing_list_id = ?
-            ORDER BY CAST(pi.num AS INTEGER) ASC
+            ORDER BY CASE WHEN pi.num = '+' THEN 1 ELSE 0 END ASC, CAST(pi.num AS INTEGER) ASC, pi.id ASC
         ");
-        $itemsStmt->execute([$listId]);
+        $itemsStmt->execute([$listId, $listId]);
         $items = $itemsStmt->fetchAll();
 
         $spreadsheet = new Spreadsheet();

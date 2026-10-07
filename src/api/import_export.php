@@ -40,6 +40,34 @@ try {
         ]);
     }
 
+    if ($action === 'backup_db') {
+        $dbFile = getDataPath() . '/warehouse.db';
+        if (!file_exists($dbFile)) {
+            jsonError('Файл базы данных не найден', 404);
+        }
+        $filename = 'warehouse_backup_' . date('Y-m-d_His') . '.db';
+        header('Content-Type: application/x-sqlite3');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . filesize($dbFile));
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        readfile($dbFile);
+        exit;
+    }
+
+    if ($action === 'clear_database') {
+        if (($_POST['confirm'] ?? '') !== 'yes') {
+            jsonError('Подтверждение очистки не получено');
+        }
+        $pdo->beginTransaction();
+        $pdo->exec("DELETE FROM product_barcodes;");
+        $pdo->exec("DELETE FROM products;");
+        $pdo->commit();
+        jsonResponse([
+            'success' => true,
+            'message' => 'База товаров и штрихкодов успешно очищена'
+        ]);
+    }
+
     if ($action === 'export') {
         // Fetch all products and their associated barcodes
         $stmt = $pdo->query("SELECT * FROM products ORDER BY manufacturer ASC, name ASC");

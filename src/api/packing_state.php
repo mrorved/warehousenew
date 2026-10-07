@@ -30,7 +30,8 @@ try {
         $updateStmt = $pdo->prepare("
             UPDATE packing_items 
             SET accepted_qty = ? 
-            WHERE packing_list_id = ? AND code = ?
+            WHERE packing_list_id = ? 
+              AND (code = ? OR (LTRIM(code, '0') != '' AND LTRIM(code, '0') = LTRIM(?, '0')))
         ");
 
         // Prepare insert statement for items that were scanned but not in original packing list (excess/unplanned)
@@ -40,7 +41,14 @@ try {
             ON CONFLICT(packing_list_id, code) DO UPDATE SET accepted_qty = excluded.accepted_qty
         ");
 
-        $findProductStmt = $pdo->prepare("SELECT name FROM products WHERE supplier_code = ?");
+        $findProductStmt = $pdo->prepare("
+            SELECT name FROM products 
+            WHERE supplier_code = ? 
+               OR our_code = ? 
+               OR (LTRIM(supplier_code, '0') != '' AND LTRIM(supplier_code, '0') = LTRIM(?, '0'))
+               OR (LTRIM(our_code, '0') != '' AND LTRIM(our_code, '0') = LTRIM(?, '0'))
+            LIMIT 1
+        ");
 
         foreach ($itemsMap as $code => $qty) {
             $code = (string)$code;
@@ -48,14 +56,18 @@ try {
 
             if ($qty === 0) {
                 // If it is an unplanned item with 0 accepted qty, delete it from the list
-                $pdo->prepare("DELETE FROM packing_items WHERE packing_list_id = ? AND code = ? AND (expected_qty = 0 OR num = '+')")
-                    ->execute([$listId, $code]);
+                $pdo->prepare("
+                    DELETE FROM packing_items 
+                    WHERE packing_list_id = ? 
+                      AND (code = ? OR (LTRIM(code, '0') != '' AND LTRIM(code, '0') = LTRIM(?, '0'))) 
+                      AND (expected_qty = 0 OR num = '+')
+                ")->execute([$listId, $code, $code]);
             }
 
-            $updateStmt->execute([$qty, $listId, $code]);
+            $updateStmt->execute([$qty, $listId, $code, $code]);
             if ($updateStmt->rowCount() === 0 && $qty > 0) {
                 // Not found in original sheet, find product name if in DB
-                $findProductStmt->execute([$code]);
+                $findProductStmt->execute([$code, $code, $code, $code]);
                 $p = $findProductStmt->fetch();
                 $name = $p ? $p['name'] : 'Товар ' . $code;
                 $insertUnplannedStmt->execute([$listId, $code, $name, $qty]);
@@ -111,8 +123,13 @@ try {
 
         $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare("UPDATE packing_items SET accepted_qty = ? WHERE packing_list_id = ? AND code = ?");
-        $stmt->execute([$qty, $listId, $code]);
+        $stmt = $pdo->prepare("
+            UPDATE packing_items 
+            SET accepted_qty = ? 
+            WHERE packing_list_id = ? 
+              AND (code = ? OR (LTRIM(code, '0') != '' AND LTRIM(code, '0') = LTRIM(?, '0')))
+        ");
+        $stmt->execute([$qty, $listId, $code, $code]);
 
         $totalAccepted = (int)$pdo->query("SELECT SUM(accepted_qty) FROM packing_items WHERE packing_list_id = $listId")->fetchColumn();
         
